@@ -3,3 +3,16 @@ __pycache__/
 *.pyc
 .env
 .DS_Store
+# AI Models & Cache
+models/
+.cache/
+huggingface/
+*.bin
+*.pth
+*.pt
+
+# Python
+__pycache__/
+*.pyc
+venv/
+.env
