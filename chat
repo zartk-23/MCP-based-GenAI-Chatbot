@@ -1,56 +1,67 @@
-# api/chat.py - Your MCP AI as a Web API
+# api/chat.py - Vercel Serverless Function
+import json
+from flask import Flask, request, jsonify
 from mcp import MCP
 from agent import needs_search, is_weather_question, is_small_talk, search_wiki
 from weather import get_weather
 from transformers import pipeline
-from flask import Flask, request, jsonify  # Vercel uses Flask for Python
-import os
-import json
+
+# === Load AI Model ONCE ===
+generator = pipeline("text2text-generation", model="google/flan-t5-small")
+mcp = MCP()  # One session (for demo)
 
 app = Flask(__name__)
 
-# Load AI Model (once)
-generator = pipeline("text2text-generation", model="google/flan-t5-small")
-mcp = MCP()  # Global for session (simple; for real prod, use sessions)
-
 @app.route('/chat', methods=['POST'])
 def chat():
-    data = request.json
-    user_input = data.get('message', '').strip()
-    
-    if not user_input:
-        return jsonify({'error': 'No message'}), 400
-    
-    # Your exact logic from gui.py!
-    mcp.add_user(user_input)
-    
-    # Small talk?
-    small_response = is_small_talk(user_input)
-    if small_response:
-        mcp.add_assistant(small_response)
-        return jsonify({'response': small_response})
-    
-    # Weather?
-    if is_weather_question(user_input):
-        city = user_input.split("in")[-1].strip() if "in" in user_input.lower() else "London"
-        fact = get_weather(city)
-        mcp.add_fact(fact)
-        response = f"Weather in {city}: {fact.split(':')[-1]}"
-        mcp.add_assistant(response)
-        return jsonify({'response': response})
-    
-    # Wiki?
-    if needs_search(user_input):
-        fact = search_wiki(user_input)
-        mcp.add_fact(fact)
-    
-    # AI Answer
-    context = mcp.get_context()
-    prompt = f"Answer in 1 short sentence using this: {context}"
-    result = generator(prompt, max_length=60, do_sample=False)[0]['generated_text']
-    mcp.add_assistant(result)
-    
-    return jsonify({'response': result})
+    try:
+        data = request.get_json()
+        user_input = data.get('message', '').strip()
+        if not user_input:
+            return jsonify({'error': 'No message'}), 400
 
-if __name__ == '__main__':
-    app.run()
+        mcp.add_user(user_input)
+
+        # Small talk
+        small_response = is_small_talk(user_input)
+        if small_response:
+            mcp.add_assistant(small_response)
+            return jsonify({'response': small_response})
+
+        # Weather
+        if is_weather_question(user_input):
+            city = user_input.split("in")[-1].strip() if "in" in user_input.lower() else "London"
+            fact = get_weather(city)
+            mcp.add_fact(fact)
+            response = f"Weather in {city}: {fact.split(':')[-1]}"
+            mcp.add_assistant(response)
+            return jsonify({'response': response})
+
+        # Wikipedia
+        if needs_search(user_input):
+            fact = search_wiki(user_input)
+            mcp.add_fact(fact)
+
+        # AI Answer
+        context = mcp.get_context()
+        prompt = f"Answer in 1 short sentence using this: {context}"
+        result = generator(prompt, max_length=60, do_sample=False)[0]['generated_text']
+        mcp.add_assistant(result)
+
+        return jsonify({'response': result})
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# === Vercel Handler ===
+def handler(event, context=None):
+    from flask import Flask
+    app = globals()['app']
+    return app(event, context)
+
+# === Required for Vercel ===
+__vercel__ = {
+    "rewrites": [
+        {"source": "/api/chat", "destination": "/api/chat.py"}
+    ]
+}
