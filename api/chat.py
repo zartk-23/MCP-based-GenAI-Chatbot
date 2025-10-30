@@ -1,20 +1,14 @@
-from flask import Flask, request, jsonify
 import json
 
-app = Flask(__name__)
-
-@app.route('/chat', methods=['POST'])
-def chat():
-    try:
-        data = request.get_json()
-        message = data.get('message', '').lower()
-
-        if 'hi' in message or 'hello' in message:
-            return jsonify({'response': 'Hello! Ask me about weather or facts!'})
-        elif 'weather' in message:
-            return jsonify({'response': 'It\'s sunny in London! ☀️'})
-        else:
-            return jsonify({'response': 'I heard: ' + message})
-
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+def handler(request):
+    if request['method'] == 'POST':
+        body = json.loads(request['body'])
+        message = body.get('message', 'hi')
+        return {
+            'statusCode': 200,
+            'body': json.dumps({'response': f'You said: {message}. Hello!'})
+        }
+    return {
+        'statusCode': 200,
+        'body': json.dumps({'response': 'API ready!'})
+    }
