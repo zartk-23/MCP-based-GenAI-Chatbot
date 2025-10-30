@@ -36,13 +36,18 @@
             addMessage(msg, true);
             input.value = '';
 
-            const res = await fetch('/api/chat', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({message: msg})
-            });
-            const data = await res.json();
-            addMessage(data.response, false);
+            try {
+                const res = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: msg })
+                });
+                if (!res.ok) throw new Error('API error: ' + res.status);
+                const data = await res.json();
+                addMessage(data.response, false);
+            } catch (error) {
+                addMessage('Error: ' + error.message, false);
+            }
         }
 
         // Welcome
